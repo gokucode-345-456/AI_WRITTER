@@ -11,20 +11,22 @@ st.set_page_config(
 # --- 2. CẤU HÌNH BẢO MẬT API KEY ---
 # Khi đưa lên web, chúng ta dùng st.secrets để giấu Key đi
 # Lát nữa mình sẽ chỉ bạn chỗ dán Key thật trên web Streamlit
+GOOGLE_API_KEY = "AIzaSyDRBlRB8o2VUWZgATilB5CWmZQnxpncKyM"
+# Đoạn code này sẽ tự thử từng tên một, cái nào chạy được thì lấy
 try:
-    API_KEY = st.secrets["GOOGLE_API_KEY"]
-    genai.configure(api_key=API_KEY)
+    model = genai.GenerativeModel('gemini-1.5-flash')
 except:
-    st.error("Chưa cấu hình API Key trong phần Secrets!")
-    st.stop()
-
+    try:
+        model = genai.GenerativeModel('models/gemini-1.5-flash')
+    except:
+        model = genai.GenerativeModel('gemini-pro') # Phương án dự phòng cuối cùng
 # --- 3. CHỌN MODEL ---
 # Dùng tên model chuẩn để tránh lỗi 404
 model = genai.GenerativeModel('gemini-1.5-flash')
 
 # --- 4. GIAO DIỆN APP ---
 st.title("✍️ Trợ Lý Viết Văn AI")
-st.markdown("Ném đề văn vào đây, tui lo hết cho cu!")
+st.markdown("đưa đề văn đây")
 
 # Ô nhập liệu - được tối ưu để gõ trên điện thoại dễ hơn
 topic = st.text_area("Chủ đề bài văn:", 
