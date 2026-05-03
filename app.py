@@ -1,33 +1,44 @@
 import streamlit as st
 import google.generativeai as genai
 
-# --- CẤU HÌNH GIAO DIỆN MOBILE ---
+# --- CẤU HÌNH GIAO DIỆN CHUẨN MOBILE ---
 st.set_page_config(page_title="Viết Văn AI", page_icon="✍️", layout="centered")
 
 st.markdown("""
     <style>
-    /* Làm gọn giao diện cho giống App */
+    /* Giấu các thành phần dư thừa */
     #MainMenu, footer, header {visibility: hidden;}
-    .stApp { background-color: #F8F9FA; }
+    .stApp { background-color: #F0F2F5; }
+    
+    /* Input kiểu app điện thoại */
     .stTextArea textarea { 
-        border-radius: 15px !important; 
+        border-radius: 20px !important; 
         font-size: 16px !important; 
+        border: 2px solid #ddd !important;
     }
+    
+    /* Nút bấm to, dễ chạm trên cảm ứng */
     .stButton>button {
         width: 100%;
-        border-radius: 25px;
+        border-radius: 30px;
         height: 3.5em;
-        background-color: #007AFF;
+        background: linear-gradient(135deg, #007AFF 0%, #0056b3 100%);
         color: white;
         font-weight: bold;
+        font-size: 18px;
         border: none;
+        margin-top: 10px;
     }
-    .result-box {
+    
+    /* Khung hiển thị bài văn */
+    .result-card {
         background-color: white;
         padding: 20px;
-        border-radius: 15px;
-        box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+        border-radius: 20px;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.05);
         line-height: 1.8;
+        font-size: 16px;
+        color: #333;
     }
     </style>
     """, unsafe_allow_html=True)
@@ -37,50 +48,56 @@ try:
     API_KEY = st.secrets["GOOGLE_API_KEY"]
     genai.configure(api_key=API_KEY)
 except:
-    st.error("Lỗi: Thiếu API Key trong Secrets!")
+    st.error("Chưa cấu hình API Key trong Secrets!")
     st.stop()
 
-# --- FIX LỖI 404 BẰNG CÁCH GỌI THẲNG MODEL TỪ DANH SÁCH ---
+# --- CƠ CHẾ TỰ ĐỘNG TÌM MODEL ĐANG SỐNG (FIX 404) ---
 @st.cache_resource
-def get_valid_model():
-    # Cách an toàn nhất: Liệt kê các model thực tế mà Key của bạn có quyền dùng
+def find_working_model():
     try:
-        available_models = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
+        # Lấy danh sách tất cả model mà Key này được phép dùng
+        available = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
         
-        # Danh sách ưu tiên (thử cái nào có sẵn trước)
-        priorities = ['models/gemini-1.5-flash', 'models/gemini-1.5-pro', 'models/gemini-pro']
+        # Danh sách ưu tiên
+        targets = ['models/gemini-1.5-flash', 'models/gemini-1.5-pro', 'models/gemini-pro']
         
-        for p in priorities:
-            if p in available_models:
-                return genai.GenerativeModel(model_name=p)
+        for t in targets:
+            if t in available:
+                return genai.GenerativeModel(t)
         
-        # Nếu không có trong ưu tiên, lấy cái đầu tiên tìm thấy
-        return genai.GenerativeModel(model_name=available_models[0])
-    except Exception as e:
-        # Nếu không liệt kê được, dùng fallback cuối cùng
-        return genai.GenerativeModel(model_name='gemini-1.5-flash')
+        # Nếu không thấy cái nào trong list ưu tiên, lấy đại cái đầu tiên đang sống
+        if available:
+            return genai.GenerativeModel(available[0])
+    except:
+        # Fallback cuối cùng nếu list_models cũng lỗi
+        return genai.GenerativeModel('gemini-1.5-flash')
+    return None
 
-model = get_valid_model()
+model = find_working_model()
 
-# --- GIAO DIỆN ---
-st.markdown("<h2 style='text-align: center;'>✍️ Trợ Lý Viết Văn</h2>", unsafe_allow_html=True)
+# --- GIAO DIỆN APP ---
+st.markdown("<h2 style='text-align: center; color: #007AFF;'>✍️ Trợ Lý Viết Văn</h2>", unsafe_allow_html=True)
+st.markdown("<p style='text-align: center; color: #666;'>Cực nhanh - Cực hay - Cực dễ</p>", unsafe_allow_html=True)
 
-topic = st.text_area("", placeholder="Nhập đề bài văn vào đây...", height=150)
+topic = st.text_area("", placeholder="Nhập chủ đề bài văn bạn muốn viết...", height=150)
 
 if st.button("🚀 BẮT ĐẦU SÁNG TÁC"):
     if topic:
-        with st.spinner('Đang múa bút...'):
+        with st.spinner('AI đang múa bút, chờ tí nhé...'):
             try:
-                # Gọi trực tiếp content
-                response = model.generate_content(f"Viết bài văn hay về: {topic}")
+                # Gửi yêu cầu viết văn
+                prompt = f"Bạn là một chuyên gia viết văn. Hãy viết một bài văn sâu sắc, hay về: {topic}"
+                response = model.generate_content(prompt)
                 
-                st.markdown("### ✨ Bài văn của bạn:")
-                st.markdown(f'<div class="result-box">{response.text}</div>', unsafe_allow_html=True)
+                st.markdown("### ✨ Tác phẩm của bạn:")
+                st.markdown(f'<div class="result-card">{response.text}</div>', unsafe_allow_html=True)
                 
-                # Nút copy
-                st.button("Làm bài khác", on_click=lambda: st.rerun())
+                # Nút reset đơn giản
+                if st.button("Viết bài khác"):
+                    st.rerun()
+                    
             except Exception as e:
-                # Hiện lỗi cụ thể để xử lý nếu vẫn bị
                 st.error(f"Lỗi: {e}")
+                st.info("Mẹo: Đợi 30 giây rồi nhấn lại nhé (lỗi giới hạn lượt dùng).")
     else:
-        st.warning("Nhập đề bài đã cu!")
+        st.warning("Nhập cái gì đó đi đã cu!")
