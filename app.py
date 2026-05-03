@@ -1,110 +1,86 @@
 import streamlit as st
 import google.generativeai as genai
 
-# --- 1. CẤU HÌNH MOBILE-FIRST ---
-st.set_page_config(
-    page_title="Viết Văn AI",
-    page_icon="✍️",
-    layout="centered",
-    initial_sidebar_state="collapsed"
-)
+# --- CẤU HÌNH GIAO DIỆN MOBILE ---
+st.set_page_config(page_title="Viết Văn AI", page_icon="✍️", layout="centered")
 
-# --- 2. CSS CUSTOM ĐỂ NHÌN GIỐNG APP ĐIỆN THOẠI ---
 st.markdown("""
     <style>
-    /* Ẩn bớt các thành phần thừa của Streamlit */
-    #MainMenu {visibility: hidden;}
-    footer {visibility: hidden;}
-    header {visibility: hidden;}
-    
-    /* Chỉnh nền app */
-    .stApp {
-        background-color: #F8F9FA;
+    /* Làm gọn giao diện cho giống App */
+    #MainMenu, footer, header {visibility: hidden;}
+    .stApp { background-color: #F8F9FA; }
+    .stTextArea textarea { 
+        border-radius: 15px !important; 
+        font-size: 16px !important; 
     }
-    
-    /* Làm khung nhập liệu to và dễ gõ */
-    .stTextArea textarea {
-        border-radius: 15px !important;
-        border: 2px solid #E0E0E0 !important;
-        padding: 15px !important;
-        font-size: 16px !important; /* Tránh iPhone tự động zoom khi focus */
-    }
-    
-    /* Nút bấm kiểu iOS/Android hiện đại */
     .stButton>button {
         width: 100%;
         border-radius: 25px;
-        height: 3em;
-        background-color: #007AFF; /* Màu xanh Apple */
+        height: 3.5em;
+        background-color: #007AFF;
         color: white;
         font-weight: bold;
         border: none;
-        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-        transition: 0.3s;
     }
-    
-    .stButton>button:active {
-        transform: scale(0.98);
-    }
-
-    /* Khung kết quả bài văn */
     .result-box {
         background-color: white;
         padding: 20px;
         border-radius: 15px;
-        border-left: 5px solid #007AFF;
         box-shadow: 0 2px 10px rgba(0,0,0,0.05);
-        line-height: 1.6;
-        font-family: 'Inter', sans-serif;
+        line-height: 1.8;
     }
     </style>
     """, unsafe_allow_html=True)
 
-# --- 3. KẾT NỐI API ---
+# --- KẾT NỐI API ---
 try:
     API_KEY = st.secrets["GOOGLE_API_KEY"]
     genai.configure(api_key=API_KEY)
 except:
-    st.error("Lỗi API Key!")
+    st.error("Lỗi: Thiếu API Key trong Secrets!")
     st.stop()
 
-# --- 4. HÀM TÌM MODEL ---
+# --- FIX LỖI 404 BẰNG CÁCH GỌI THẲNG MODEL TỪ DANH SÁCH ---
 @st.cache_resource
-def get_model():
-    # Ưu tiên Flash cho nhanh và mượt trên mobile
-    for m_name in ['gemini-1.5-flash', 'models/gemini-1.5-flash', 'gemini-pro']:
-        try:
-            m = genai.GenerativeModel(m_name)
-            return m
-        except:
-            continue
-    return None
+def get_valid_model():
+    # Cách an toàn nhất: Liệt kê các model thực tế mà Key của bạn có quyền dùng
+    try:
+        available_models = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
+        
+        # Danh sách ưu tiên (thử cái nào có sẵn trước)
+        priorities = ['models/gemini-1.5-flash', 'models/gemini-1.5-pro', 'models/gemini-pro']
+        
+        for p in priorities:
+            if p in available_models:
+                return genai.GenerativeModel(model_name=p)
+        
+        # Nếu không có trong ưu tiên, lấy cái đầu tiên tìm thấy
+        return genai.GenerativeModel(model_name=available_models[0])
+    except Exception as e:
+        # Nếu không liệt kê được, dùng fallback cuối cùng
+        return genai.GenerativeModel(model_name='gemini-1.5-flash')
 
-model = get_model()
+model = get_valid_model()
 
-# --- 5. GIAO DIỆN CHÍNH ---
-st.markdown("<h1 style='text-align: center; color: #1C1C1E;'>✍️ Viết Văn AI</h1>", unsafe_allow_html=True)
-st.markdown("<p style='text-align: center; color: #8E8E93;'>Nhập đề bài và để AI lo phần còn lại</p>", unsafe_allow_html=True)
+# --- GIAO DIỆN ---
+st.markdown("<h2 style='text-align: center;'>✍️ Trợ Lý Viết Văn</h2>", unsafe_allow_html=True)
 
-# Khung nhập liệu
-topic = st.text_area("", placeholder="Hôm nay bạn muốn viết về chủ đề gì?", height=120)
+topic = st.text_area("", placeholder="Nhập đề bài văn vào đây...", height=150)
 
-# Nút bấm to, chiếm hết chiều ngang màn hình điện thoại
-if st.button("🚀 BẮT ĐẦU VIẾT"):
+if st.button("🚀 BẮT ĐẦU SÁNG TÁC"):
     if topic:
-        with st.spinner('Đang suy nghĩ...'):
+        with st.spinner('Đang múa bút...'):
             try:
-                response = model.generate_content(f"Viết bài văn về: {topic}")
+                # Gọi trực tiếp content
+                response = model.generate_content(f"Viết bài văn hay về: {topic}")
                 
-                st.markdown("### ✨ Kết quả:")
-                # Cho kết quả vào một cái box nhìn cho chuyên nghiệp
+                st.markdown("### ✨ Bài văn của bạn:")
                 st.markdown(f'<div class="result-box">{response.text}</div>', unsafe_allow_html=True)
                 
-                # Nút copy nhanh (Streamlit hỗ trợ sẵn)
-                st.copy_to_clipboard(response.text)
-                st.toast("Đã copy bài văn!")
-                
+                # Nút copy
+                st.button("Làm bài khác", on_click=lambda: st.rerun())
             except Exception as e:
+                # Hiện lỗi cụ thể để xử lý nếu vẫn bị
                 st.error(f"Lỗi: {e}")
     else:
-        st.warning("Bạn chưa nhập đề bài mà!")
+        st.warning("Nhập đề bài đã cu!")
