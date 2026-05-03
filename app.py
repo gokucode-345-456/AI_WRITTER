@@ -1,103 +1,66 @@
 import streamlit as st
 import google.generativeai as genai
 
-# --- CẤU HÌNH GIAO DIỆN CHUẨN MOBILE ---
-st.set_page_config(page_title="Viết Văn AI", page_icon="✍️", layout="centered")
+# Cấu hình giao diện Mobile
+st.set_page_config(page_title="AI Thám Tử", page_icon="🕵️")
 
 st.markdown("""
     <style>
-    /* Giấu các thành phần dư thừa */
-    #MainMenu, footer, header {visibility: hidden;}
-    .stApp { background-color: #F0F2F5; }
-    
-    /* Input kiểu app điện thoại */
-    .stTextArea textarea { 
-        border-radius: 20px !important; 
-        font-size: 16px !important; 
-        border: 2px solid #ddd !important;
-    }
-    
-    /* Nút bấm to, dễ chạm trên cảm ứng */
-    .stButton>button {
-        width: 100%;
-        border-radius: 30px;
-        height: 3.5em;
-        background: linear-gradient(135deg, #007AFF 0%, #0056b3 100%);
-        color: white;
-        font-weight: bold;
-        font-size: 18px;
-        border: none;
-        margin-top: 10px;
-    }
-    
-    /* Khung hiển thị bài văn */
-    .result-card {
-        background-color: white;
-        padding: 20px;
-        border-radius: 20px;
-        box-shadow: 0 4px 15px rgba(0,0,0,0.05);
-        line-height: 1.8;
-        font-size: 16px;
-        color: #333;
-    }
+    .stApp { background-color: #f0f2f6; }
+    .stButton>button { width: 100%; border-radius: 20px; height: 3em; background: #007AFF; color: white; border: none; }
+    .status-box { padding: 15px; border-radius: 15px; background: white; margin-bottom: 10px; border-left: 5px solid #007AFF; }
     </style>
     """, unsafe_allow_html=True)
 
-# --- KẾT NỐI API ---
+# Kết nối API
 try:
     API_KEY = st.secrets["GOOGLE_API_KEY"]
     genai.configure(api_key=API_KEY)
 except:
-    st.error("Chưa cấu hình API Key trong Secrets!")
+    st.error("Thiếu API Key trong Secrets!")
     st.stop()
 
-# --- CƠ CHẾ TỰ ĐỘNG TÌM MODEL ĐANG SỐNG (FIX 404) ---
-@st.cache_resource
-def find_working_model():
-    try:
-        # Lấy danh sách tất cả model mà Key này được phép dùng
-        available = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
-        
-        # Danh sách ưu tiên
-        targets = ['models/gemini-1.5-flash', 'models/gemini-1.5-pro', 'models/gemini-pro']
-        
-        for t in targets:
-            if t in available:
-                return genai.GenerativeModel(t)
-        
-        # Nếu không thấy cái nào trong list ưu tiên, lấy đại cái đầu tiên đang sống
-        if available:
-            return genai.GenerativeModel(available[0])
-    except:
-        # Fallback cuối cùng nếu list_models cũng lỗi
-        return genai.GenerativeModel('gemini-1.5-flash')
-    return None
+st.title("🕵️ Máy Dò Model AI")
 
-model = find_working_model()
+# --- PHẦN 1: THÁM TỬ ---
+if st.button("🔍 BẮT ĐẦU DÒ TÌM MODEL"):
+    with st.spinner("Đang lục soát kho hàng của Google..."):
+        try:
+            # Lấy tất cả model hỗ trợ viết văn
+            models = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
+            
+            if models:
+                st.success(f"Tìm thấy {len(models)} model khả dụng!")
+                # Lưu danh sách vào session để dùng cho phần dưới
+                st.session_state['found_models'] = models
+                for m in models:
+                    st.code(m)
+            else:
+                st.error("Không tìm thấy model nào! Có thể Key bị chặn vùng.")
+        except Exception as e:
+            st.error(f"Lỗi khi dò tìm: {e}")
 
-# --- GIAO DIỆN APP ---
-st.markdown("<h2 style='text-align: center; color: #007AFF;'>✍️ Trợ Lý Viết Văn</h2>", unsafe_allow_html=True)
-st.markdown("<p style='text-align: center; color: #666;'>Cực nhanh - Cực hay - Cực dễ</p>", unsafe_allow_html=True)
+st.divider()
 
-topic = st.text_area("", placeholder="Nhập chủ đề bài văn bạn muốn viết...", height=150)
-
-if st.button("🚀 BẮT ĐẦU SÁNG TÁC"):
-    if topic:
-        with st.spinner('AI đang múa bút, chờ tí nhé...'):
-            try:
-                # Gửi yêu cầu viết văn
-                prompt = f"Bạn là một chuyên gia viết văn. Hãy viết một bài văn sâu sắc, hay về: {topic}"
-                response = model.generate_content(prompt)
-                
-                st.markdown("### ✨ Tác phẩm của bạn:")
-                st.markdown(f'<div class="result-card">{response.text}</div>', unsafe_allow_html=True)
-                
-                # Nút reset đơn giản
-                if st.button("Viết bài khác"):
-                    st.rerun()
-                    
-            except Exception as e:
-                st.error(f"Lỗi: {e}")
-                st.info("Mẹo: Đợi 30 giây rồi nhấn lại nhé (lỗi giới hạn lượt dùng).")
-    else:
-        st.warning("Nhập cái gì đó đi đã cu!")
+# --- PHẦN 2: CHỌN VÀ VIẾT ---
+if 'found_models' in st.session_state:
+    st.subheader("✍️ Thử nghiệm viết văn")
+    
+    # Cho bạn chọn model từ danh sách vừa tìm được
+    selected_model_name = st.selectbox("Chọn model muốn thử:", st.session_state['found_models'])
+    
+    topic = st.text_area("Nhập đề bài:", placeholder="Ví dụ: Tả con chó nhà em")
+    
+    if st.button("🚀 CHẠY THỬ MODEL NÀY"):
+        try:
+            # Khởi tạo model bạn đã chọn
+            test_model = genai.GenerativeModel(selected_model_name)
+            response = test_model.generate_content(f"Viết bài văn ngắn về: {topic}")
+            
+            st.markdown("### ✨ Kết quả:")
+            st.info(response.text)
+        except Exception as e:
+            st.error(f"Model này báo lỗi: {e}")
+            st.warning("Gợi ý: Thử chọn model khác trong danh sách trên!")
+else:
+    st.info("Bấm nút 'Dò tìm' ở trên trước để xem Key của bạn dùng được những gì nhé!")
