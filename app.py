@@ -1,55 +1,55 @@
 import streamlit as st
 import google.generativeai as genai
 
-# --- 1. CẤU HÌNH GIAO DIỆN (Để hiển thị đẹp trên điện thoại) ---
-st.set_page_config(
-    page_title="Viết Văn AI",
-    page_icon="✍️",
-    layout="centered" # Giúp nội dung không bị tràn sang hai bên
-)
+# Cấu hình giao diện
+st.set_page_config(page_title="Viết Văn AI", page_icon="✍️", layout="centered")
 
-# --- 2. CẤU HÌNH BẢO MẬT API KEY ---
-# Khi đưa lên web, chúng ta dùng st.secrets để giấu Key đi
-# Lát nữa mình sẽ chỉ bạn chỗ dán Key thật trên web Streamlit
-GOOGLE_API_KEY = "AIzaSyDRBlRB8o2VUWZgATilB5CWmZQnxpncKyM"
-# Đoạn code này sẽ tự thử từng tên một, cái nào chạy được thì lấy
+# Lấy Key từ Secrets
 try:
-    model = genai.GenerativeModel('gemini-1.5-flash')
+    API_KEY = st.secrets["GOOGLE_API_KEY"]
+    genai.configure(api_key=API_KEY)
 except:
-    try:
-        model = genai.GenerativeModel('models/gemini-1.5-flash')
-    except:
-        model = genai.GenerativeModel('gemini-pro') # Phương án dự phòng cuối cùng
-# --- 3. CHỌN MODEL ---
-# Dùng tên model chuẩn để tránh lỗi 404
-model = genai.GenerativeModel('gemini-1.5-flash')
+    st.error("Thiếu GOOGLE_API_KEY trong phần Secrets!")
+    st.stop()
 
-# --- 4. GIAO DIỆN APP ---
+# --- CHIÊU CUỐI: TỰ ĐỘNG DÒ TÌM MODEL ---
+@st.cache_resource # Lưu lại kết quả để không phải quét nhiều lần
+def get_working_model():
+    # Danh sách các tên gọi có thể chạy được của Gemini
+    model_names = [
+        'gemini-1.5-flash', 
+        'models/gemini-1.5-flash', 
+        'gemini-pro', 
+        'models/gemini-pro'
+    ]
+    
+    for name in model_names:
+        try:
+            m = genai.GenerativeModel(name)
+            # Thử yêu cầu nhẹ để check xem có chạy thật không
+            m.generate_content("hi", generation_config={"max_output_tokens": 1})
+            return m
+        except:
+            continue
+    return None
+
+model = get_working_model()
+
+if model is None:
+    st.error("Không tìm thấy model nào khả dụng. Kiểm tra lại API Key hoặc vùng địa lý!")
+    st.stop()
+
+# --- GIAO DIỆN APP ---
 st.title("✍️ Trợ Lý Viết Văn AI")
-st.markdown("đưa đề văn đây")
+topic = st.text_area("Chủ đề bài văn:", height=150)
 
-# Ô nhập liệu - được tối ưu để gõ trên điện thoại dễ hơn
-topic = st.text_area("Chủ đề bài văn:", 
-                     placeholder="Ví dụ: Tả Michael Jackson hoặc Nghị luận về học tập...",
-                     height=150)
-
-# Nút bấm
 if st.button("🚀 Bắt đầu sáng tác"):
     if topic:
-        with st.spinner('Đang múa bút... đợi tí nhé!'):
+        with st.spinner('Đang múa bút...'):
             try:
-                # Prompt để AI viết hay hơn
-                full_prompt = f"Bạn là một học sinh giỏi văn. Hãy viết một bài văn sâu sắc, giàu cảm xúc về: {topic}"
-                response = model.generate_content(full_prompt)
-                
-                # Hiển thị kết quả
+                response = model.generate_content(f"Viết bài văn về: {topic}")
                 st.success("Xong rồi nè!")
                 st.markdown("---")
                 st.write(response.text)
-                
-                # Thêm nút để copy nhanh (tiện cho điện thoại)
-                st.button("Làm lại bài khác", on_click=lambda: st.rerun())
             except Exception as e:
-                st.error(f"Lỗi rồi: {e}")
-    else:
-        st.warning("Nhập cái gì đó đi chứ cu!")
+                st.error(f"Lỗi: {e}")
