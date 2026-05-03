@@ -1,22 +1,20 @@
 import streamlit as st
 import google.generativeai as genai
-from google.generativeai.types import RequestOptions # Thêm dòng này để ép phiên bản
 
 st.set_page_config(page_title="Viết Văn AI", page_icon="✍️")
 
+# 1. Cấu hình API Key
 try:
     API_KEY = st.secrets["GOOGLE_API_KEY"]
-    # Cấu hình API key
     genai.configure(api_key=API_KEY)
 except:
-    st.error("Thiếu GOOGLE_API_KEY!")
+    st.error("Thiếu GOOGLE_API_KEY trong Secrets!")
     st.stop()
 
-# --- CHIÊU CUỐI: ÉP PHIÊN BẢN API VÀO REQUEST ---
-# Chúng ta dùng RequestOptions để bắt nó chạy bản v1 thay vì v1beta
-model = genai.GenerativeModel(
-    model_name='gemini-1.5-flash', # Quay lại bản ổn định nhất
-)
+# 2. KHỞI TẠO MODEL THEO CÁCH "AN TOÀN" NHẤT
+# Mình sẽ bỏ RequestOptions và chỉ dùng tên model kèm prefix
+# Thử dùng bản Flash ổn định nhất hiện nay
+model = genai.GenerativeModel('gemini-1.5-flash')
 
 st.title("✍️ Trợ Lý Viết Văn AI")
 
@@ -26,14 +24,22 @@ if st.button("🚀 Bắt đầu sáng tác"):
     if topic:
         with st.spinner('Đang múa bút...'):
             try:
-                # ÉP PHIÊN BẢN API Ở ĐÂY
-                response = model.generate_content(
-                    f"Viết bài văn về: {topic}",
-                    request_options=RequestOptions(api_version='v1') # ÉP DÙNG V1
-                )
+                # Gửi yêu cầu bình thường, không thêm option phức tạp
+                response = model.generate_content(f"Viết bài văn về: {topic}")
+                
                 st.success("Xong rồi nè!")
                 st.markdown("---")
                 st.write(response.text)
             except Exception as e:
-                st.error(f"Lỗi rồi cu ơi: {e}")
-                st.info("Thử đổi tên model trong code thành 'gemini-3.1-flash-live-preview' nếu vẫn lỗi 404 nhé!")
+                # Nếu vẫn báo 404, chúng ta sẽ thử "ép" tên model khác ngay tại đây
+                st.warning("Đang thử kết nối lại bằng giao thức dự phòng...")
+                try:
+                    # Thử lại với tên đầy đủ nếu bản ngắn gọn bị 404
+                    alternative_model = genai.GenerativeModel('models/gemini-1.5-flash')
+                    response = alternative_model.generate_content(f"Viết bài văn về: {topic}")
+                    st.success("Xong rồi nè!")
+                    st.write(response.text)
+                except Exception as e2:
+                    st.error(f"Lỗi hệ thống: {e2}")
+    else:
+        st.warning("Nhập đề bài đã cu!")
