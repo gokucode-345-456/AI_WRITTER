@@ -1,101 +1,64 @@
 import streamlit as st
 import google.generativeai as genai
 
-# --- CẤU HÌNH GIAO DIỆN CHUẨN ---
-st.set_page_config(
-    page_title="AI Viết Văn Pro",
-    page_icon="✍️",
-    layout="centered"
-)
+# --- CẤU HÌNH GIAO DIỆN ---
+st.set_page_config(page_title="AI Viết Văn Pro", page_icon="✍️")
 
-# CSS Custom: Đẹp trên cả máy tính lẫn điện thoại
+# CSS cho giao diện App và Nhật ký
 st.markdown("""
     <style>
-    /* Tổng thể */
-    .stApp { background-color: #f8f9fa; }
-    
-    /* Ẩn bớt rác Streamlit */
     #MainMenu, footer, header {visibility: hidden;}
-    
-    /* Khung nhập liệu */
-    .stTextArea textarea {
-        border-radius: 15px !important;
-        font-size: 16px !important;
-        border: 2px solid #ddd !important;
-        box-shadow: 0 2px 5px rgba(0,0,0,0.05);
-    }
-
-    /* Nút bấm kiểu Modern */
-    .stButton>button {
-        width: 100%;
-        border-radius: 12px;
-        height: 3.5em;
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-        color: white;
-        font-weight: bold;
-        font-size: 18px;
-        border: none;
-        transition: 0.3s;
-    }
-    .stButton>button:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 5px 15px rgba(0,0,0,0.1);
-    }
-
-    /* Khung kết quả bài văn */
-    .paper-style {
-        background-color: white;
-        padding: 30px;
-        border-radius: 10px;
-        box-shadow: 0 10px 25px rgba(0,0,0,0.05);
-        line-height: 1.8;
-        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-        color: #2d3436;
-        border-top: 5px solid #667eea;
-        margin-top: 20px;
-    }
+    .stApp { background-color: #f8f9fa; }
+    .stButton>button { width: 100%; border-radius: 12px; background: #007AFF; color: white; font-weight: bold; }
+    .paper-style { background: white; padding: 25px; border-radius: 15px; border-left: 5px solid #007AFF; box-shadow: 0 4px 10px rgba(0,0,0,0.05); margin-bottom: 20px; }
+    .history-card { background: #fff; padding: 10px; border-radius: 8px; margin-bottom: 5px; border: 1px solid #ddd; font-size: 14px; }
     </style>
     """, unsafe_allow_html=True)
 
-# --- CẤU HÌNH API ---
+# --- KHỞI TẠO DỮ LIỆU LƯU TRỮ ---
+if 'history' not in st.session_state:
+    st.session_state['history'] = []
+
+# --- KẾT NỐI API ---
 try:
-    # Lấy Key từ Secrets (Bạn nhớ dán Key mới vào Secrets rồi nhé!)
-    API_KEY = st.secrets["GOOGLE_API_KEY"]
-    genai.configure(api_key=API_KEY)
-    
-    # ÉP DÙNG MODEL BẠN CHỌN
+    genai.configure(api_key=st.secrets["GOOGLE_API_KEY"])
+    # Ưu tiên bản 3.1 Lite bạn thích, không được thì 1.5
     model = genai.GenerativeModel('models/gemini-3.1-flash-lite-preview')
-except Exception as e:
-    st.error(f"Lỗi cấu hình: {e}")
-    st.stop()
+except:
+    model = genai.GenerativeModel('models/gemini-1.5-flash')
 
 # --- GIAO DIỆN CHÍNH ---
-st.markdown("<h1 style='text-align: center; color: #4834d4;'>✍️ Trợ Lý Viết Văn AI</h1>", unsafe_allow_html=True)
-st.markdown("<p style='text-align: center; color: #636e72;'>Sáng tạo nội dung đỉnh cao trong vài giây</p>", unsafe_allow_html=True)
+st.title("✍️ Trợ Lý Viết Văn AI")
 
-# Ô nhập đề bài
-topic = st.text_area("", placeholder="Ví dụ: Viết một bài văn biểu cảm về người mẹ thân yêu của em...", height=150)
+topic = st.text_area("", placeholder="Nhập đề bài văn vào đây...", height=120)
 
-# Nút bấm
 if st.button("🚀 BẮT ĐẦU SÁNG TÁC"):
     if topic:
-        with st.spinner('AI đang múa bút...'):
+        with st.spinner('AI đang sáng tác...'):
             try:
-                # Gửi yêu cầu
-                response = model.generate_content(f"Bạn là một nhà văn giỏi. Hãy viết một bài văn thật hay, giàu cảm xúc về: {topic}")
+                response = model.generate_content(f"Hãy viết một bài văn chuyên văn cực hay về: {topic}")
+                content = response.text
                 
-                # Hiển thị kết quả
-                st.markdown("---")
-                st.markdown(f'<div class="paper-style">{response.text}</div>', unsafe_allow_html=True)
+                # Lưu vào lịch sử (đưa lên đầu danh sách)
+                st.session_state.history.insert(0, {"topic": topic, "content": content})
                 
-                # Nút phụ để làm mới
-                st.button("Viết đề bài khác", on_click=lambda: st.rerun)
+                # Hiển thị bài vừa viết
+                st.markdown("### ✨ Tác phẩm mới nhất:")
+                st.markdown(f'<div class="paper-style">{content}</div>', unsafe_allow_html=True)
+                
+                # Nút tải về máy
+                st.download_button(label="📥 Tải bài văn này (.txt)", data=content, file_name=f"{topic[:20]}.txt", mime="text/plain")
                 
             except Exception as e:
-                # Xử lý lỗi quota 429
-                if "429" in str(e):
-                    st.warning("⚠️ AI đang hơi bận vì quá nhiều người dùng. Đợi 30 giây rồi nhấn lại bạn nhé!")
-                else:
-                    st.error(f"Có lỗi xảy ra: {e}")
+                st.error(f"Lỗi: {e}")
     else:
-        st.warning("Vui lòng nhập đề bài trước nhé!")
+        st.warning("Nhập đề bài đã cu!")
+
+# --- PHẦN NHẬT KÝ LƯU TRỮ ---
+if st.session_state.history:
+    st.divider()
+    st.subheader("📚 Nhật ký sáng tác")
+    for i, item in enumerate(st.session_state.history):
+        with st.expander(f"📝 {item['topic'][:50]}..."):
+            st.write(item['content'])
+            st.download_button(label="Tải lại file", data=item['content'], file_name=f"bai_van_{i}.txt", key=f"btn_{i}")
