@@ -1,33 +1,39 @@
 import streamlit as st
 import google.generativeai as genai
+from google.generativeai.types import RequestOptions # Thêm dòng này để ép phiên bản
 
-# Cấu hình giao diện
 st.set_page_config(page_title="Viết Văn AI", page_icon="✍️")
 
-# Kết nối API Key từ Secrets
 try:
-    genai.configure(api_key=st.secrets["GOOGLE_API_KEY"])
+    API_KEY = st.secrets["GOOGLE_API_KEY"]
+    # Cấu hình API key
+    genai.configure(api_key=API_KEY)
 except:
-    st.error("Thiếu GOOGLE_API_KEY trong Secrets!")
+    st.error("Thiếu GOOGLE_API_KEY!")
     st.stop()
 
-# --- SỬ DỤNG MODEL BẠN VỪA TÌM THẤY ---
-model = genai.GenerativeModel('models/gemini-3.1-flash-live-preview')
+# --- CHIÊU CUỐI: ÉP PHIÊN BẢN API VÀO REQUEST ---
+# Chúng ta dùng RequestOptions để bắt nó chạy bản v1 thay vì v1beta
+model = genai.GenerativeModel(
+    model_name='gemini-1.5-flash', # Quay lại bản ổn định nhất
+)
 
 st.title("✍️ Trợ Lý Viết Văn AI")
-st.markdown("Đã kết nối với bộ não mới nhất: **Gemini 3.1 Flash**")
 
-topic = st.text_area("Nhập đề văn của bạn:", placeholder="Ví dụ: Tả con mèo nhà em...", height=150)
+topic = st.text_area("Nhập đề bài:", height=150)
 
 if st.button("🚀 Bắt đầu sáng tác"):
     if topic:
         with st.spinner('Đang múa bút...'):
             try:
-                response = model.generate_content(f"Hãy viết một bài văn hay về: {topic}")
+                # ÉP PHIÊN BẢN API Ở ĐÂY
+                response = model.generate_content(
+                    f"Viết bài văn về: {topic}",
+                    request_options=RequestOptions(api_version='v1') # ÉP DÙNG V1
+                )
                 st.success("Xong rồi nè!")
                 st.markdown("---")
                 st.write(response.text)
             except Exception as e:
-                st.error(f"Lỗi: {e}")
-    else:
-        st.warning("Nhập đề bài đã cu!")
+                st.error(f"Lỗi rồi cu ơi: {e}")
+                st.info("Thử đổi tên model trong code thành 'gemini-3.1-flash-live-preview' nếu vẫn lỗi 404 nhé!")
