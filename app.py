@@ -1,10 +1,10 @@
 import streamlit as st
 import google.generativeai as genai
 
-# --- CẤU HÌNH GIAO DIỆN ---
+#giao diện
 st.set_page_config(page_title="AI Viết Văn Pro", page_icon="✍️")
 
-# CSS cho giao diện App và Nhật ký
+# css
 st.markdown("""
     <style>
     #MainMenu, footer, header {visibility: hidden;}
@@ -15,14 +15,13 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-# --- KHỞI TẠO DỮ LIỆU LƯU TRỮ ---
+#khơi tạo dữ liệu lưu trữ
 if 'history' not in st.session_state:
     st.session_state['history'] = []
 
 # --- KẾT NỐI API ---
 try:
     genai.configure(api_key=st.secrets["GOOGLE_API_KEY"])
-    # Ưu tiên bản 3.1 Lite bạn thích, không được thì 1.5
     model = genai.GenerativeModel('models/gemini-3.1-flash-lite-preview')
 except:
     model = genai.GenerativeModel('models/gemini-1.5-flash')
@@ -45,7 +44,6 @@ if st.button("🚀 BẮT ĐẦU SÁNG TÁC"):
                 # Hiển thị bài vừa viết
                 st.markdown("### ✨ Tác phẩm mới nhất:")
                 st.markdown(f'<div class="paper-style">{content}</div>', unsafe_allow_html=True)
-                
                 # Nút tải về máy
                 st.download_button(label="📥 Tải bài văn này (.txt)", data=content, file_name=f"{topic[:20]}.txt", mime="text/plain")
                 
